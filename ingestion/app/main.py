@@ -10,13 +10,16 @@ import time
 
 with engine.connect() as con:
     con.execute(text("CREATE SCHEMA IF NOT EXISTS ingestion"))
+    con.commit()
+
+with engine.connect() as con:
     # Add department column if it doesn't exist
     try:
         con.execute(text("ALTER TABLE ingestion.dataset_zones ADD COLUMN IF NOT EXISTS department VARCHAR"))
+        con.commit()
     except Exception:
         # Table might not exist yet, create_all will handle it
         pass
-    con.commit()
 
 Base.metadata.create_all(bind=engine)
 

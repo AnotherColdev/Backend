@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  db_postgres:
+    image: postgres:15
+    container_name: transformation_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: territorial_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ms-transformation:
+    build: .
+    container_name: transformation_app
+    ports:
+      - "8004:8004"
+    depends_on:
+      db_postgres:
+        condition: service_healthy
+    volumes:
+      - shared_storage:/app/storage
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_HOST=db_postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=territorial_db
+      - STORAGE_PATH=/app/storage
+
+volumes:
+  postgres_data:
+  shared_storage:

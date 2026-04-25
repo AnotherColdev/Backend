@@ -17,7 +17,7 @@ async def log_audit_action(action: str, details: str = None, user_id: str = None
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{settings.MS_AUDIT_TRACE_URL}/api/v1/audit/",
+                f"{settings.MS_AUDIT_TRACE_URL}/",
                 json=payload,
                 headers=headers,
                 timeout=5.0
