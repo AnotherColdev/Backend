@@ -1,0 +1,7 @@
+# Documentos de uso para referencia interna
+*.docx
+*.csv
+doc_text.txt
+
+# Carpetas con archivos residuales de ejecución
+.pytest_cache/

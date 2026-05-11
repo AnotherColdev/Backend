@@ -1,6 +1,11 @@
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, Request, HTTPException
+# pyrefly: ignore [missing-import]
 from fastapi.responses import JSONResponse
+# pyrefly: ignore [missing-import]
 from app.api.endpoints import proxy
+from app.api.endpoints.export import router as export_router
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.auth_middleware import auth_middleware
 import uuid
@@ -64,6 +69,7 @@ app.add_middleware(
 )
 
 app.include_router(proxy.router, prefix="/api/v1", tags=["proxy"])
+app.include_router(export_router, prefix="/api/v1", tags=["export"])
 
 @app.get("/health")
 def health_check():
