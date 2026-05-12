@@ -1,0 +1,7 @@
+# Cache de Python - generado automáticamente
+__pycache__/
+*.pyc
+*.pyo
+
+# Variables de entorno
+.env
