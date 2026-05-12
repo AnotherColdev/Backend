@@ -2,13 +2,16 @@
 HU-28: Servicio de auditoría del BFF Gateway.
 SRP: Solo se encarga de enviar eventos de traza a ms-audit-trace.
 """
-# pyrefly: ignore [missing-import]
 import httpx
 import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
+
 from app.core.config import settings
+
 logger = logging.getLogger("ExportAuditService")
+
+
 async def sendExportAuditEvent(
     userId: str,
     executionId: str,
@@ -19,6 +22,7 @@ async def sendExportAuditEvent(
 ) -> bool:
     """
     Envía un evento de auditoría al ms-audit-trace tras una exportación exitosa.
+
     Args:
         userId: ID del usuario que ejecutó la exportación.
         executionId: ID de la ejecución de scoring asociada.
@@ -26,6 +30,7 @@ async def sendExportAuditEvent(
         exportFormat: Formato del archivo exportado ('csv' o 'json').
         zoneCode: Código de zona (solo para exportación de detalle).
         resultSummary: Resumen opcional de los datos exportados.
+
     Returns:
         True si el evento fue registrado correctamente, False en caso contrario.
     """
@@ -43,6 +48,7 @@ async def sendExportAuditEvent(
         },
         "result_summary": resultSummary or {},
     }
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.post(

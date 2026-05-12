@@ -1,6 +1,7 @@
 """
 HU-28: Endpoints de exportación del BFF Gateway.
 Implementa los endpoints de exportación de ranking (CSV) y detalle de zona (JSON).
+
 Actividades técnicas:
   1. GET /api/v1/export/ranking?execution_id=xxx&format=csv → CSV con ranking
   2. GET /api/v1/export/zone-report/{zone_code}?format=json → JSON de zona
@@ -9,10 +10,10 @@ Actividades técnicas:
 """
 import logging
 from datetime import datetime, timezone
-# pyrefly: ignore [missing-import]
+
 from fastapi import APIRouter, Query, HTTPException, Request, BackgroundTasks
-# pyrefly: ignore [missing-import]
 from fastapi.responses import StreamingResponse, JSONResponse
+
 from app.services.export_service import (
     fetchRankingData,
     generateRankingCsv,
@@ -20,14 +21,20 @@ from app.services.export_service import (
     validateExecutionStatus,
 )
 from app.services.audit_service import sendExportAuditEvent
+
 logger = logging.getLogger("ExportEndpoints")
+
 router = APIRouter(prefix="/export", tags=["Exportación HU-28"])
+
+
 def _getUserId(request: Request) -> str:
     """Extrae el user_id del JWT decodificado en el middleware de autenticación."""
     user = getattr(request.state, "user", None)
     if user and isinstance(user, dict):
         return user.get("sub", user.get("user_id", "anonymous"))
     return "anonymous"
+
+
 @router.get(
     "/ranking",
     summary="Exportar ranking de zonas en CSV",
@@ -78,6 +85,7 @@ async def exportRanking(
                 ),
             },
         )
+
     # --- Validación de estado COMPLETED ---
     validation = await validateExecutionStatus(execution_id)
     if not validation["valid"]:
@@ -89,6 +97,7 @@ async def exportRanking(
                 "message": validation["message"],
             },
         )
+
     # --- Obtener datos de ranking ---
     try:
         rankingData = await fetchRankingData(execution_id)
@@ -104,12 +113,15 @@ async def exportRanking(
                 ),
             },
         )
+
     # --- Generar CSV ---
     csvBytes = generateRankingCsv(rankingData)
     totalZones = len(rankingData.get("zones", []))
+
     # --- Nombre del archivo ---
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"ranking_{execution_id[:8]}_{timestamp}.csv"
+
     # --- Auditoría en background ---
     userId = _getUserId(request)
     backgroundTasks.add_task(
@@ -123,10 +135,12 @@ async def exportRanking(
             "filename": filename,
         },
     )
+
     logger.info(
         f"CSV export generated: {filename} ({totalZones} zones) "
         f"by user {userId}"
     )
+
     # --- StreamingResponse ---
     return StreamingResponse(
         iter([csvBytes]),
@@ -141,6 +155,8 @@ async def exportRanking(
             ),
         },
     )
+
+
 @router.get(
     "/zone-report/{zone_code}",
     summary="Exportar reporte completo de zona en JSON",
@@ -181,6 +197,7 @@ async def exportZoneReport(
                 ),
             },
         )
+
     # --- Validación del zone_code ---
     if not zone_code or len(zone_code.strip()) == 0:
         raise HTTPException(
@@ -190,6 +207,7 @@ async def exportZoneReport(
                 "message": "El código de zona no puede estar vacío.",
             },
         )
+
     # --- Construir reporte ---
     try:
         report = await buildZoneReport(zone_code.strip())
@@ -205,6 +223,7 @@ async def exportZoneReport(
                 ),
             },
         )
+
     # --- Auditoría en background ---
     userId = _getUserId(request)
     backgroundTasks.add_task(
@@ -219,9 +238,11 @@ async def exportZoneReport(
             "score_level": report.get("score", {}).get("score_level", "N/A"),
         },
     )
+
     logger.info(
         f"Zone report exported: {zone_code} by user {userId}"
     )
+
     return JSONResponse(
         content=report,
         headers={

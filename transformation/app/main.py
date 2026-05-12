@@ -147,3 +147,37 @@ def transform_advanced(
         rules_applied=run.rules_applied,
         created_at=run.created_at,
     )
+
+
+@app.get(
+    "/api/v1/transform/results",
+    summary="Listar todas las ejecuciones de transformación",
+    tags=["transformation"],
+)
+def list_runs(
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna la lista de todas las transformaciones realizadas, ordenadas por fecha.
+    """
+    from app.services.transformation_service import list_transformation_runs
+    return list_transformation_runs(db)
+
+
+@app.get(
+    "/api/v1/transform/results/{run_id}",
+    summary="Obtener resultados de una transformación",
+    tags=["transformation"],
+)
+def get_results(
+    run_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna los registros transformados celda por celda para un run_id dado.
+    """
+    from app.services.transformation_service import get_transformation_results
+    results = get_transformation_results(db, run_id)
+    if not results:
+        raise DomainException(f"No se encontraron resultados para el run_id {run_id}", status_code=404)
+    return results

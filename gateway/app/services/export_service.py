@@ -8,10 +8,14 @@ import csv
 import io
 import logging
 from typing import Dict, Any, List, Optional
-# pyrefly: ignore [missing-import]
+
 import httpx
+
 from app.core.config import settings
+
 logger = logging.getLogger("ExportService")
+
+
 def _generateRecommendation(scoreLevel: str, scoreValue: float) -> str:
     """
     Genera una recomendación textual basada en el nivel y score de la zona.
@@ -38,10 +42,13 @@ def _generateRecommendation(scoreLevel: str, scoreValue: float) -> str:
         scoreLevel,
         "Sin recomendación disponible para el nivel indicado.",
     )
+
+
 def _formatIndicators(indicators: Optional[Dict[str, Any]]) -> str:
     """Formatea los indicadores para la columna CSV."""
     if not indicators:
         return "Sin indicadores"
+
     parts = []
     indicatorMapping = {
         "population_indicator": "Población",
@@ -55,13 +62,18 @@ def _formatIndicators(indicators: Optional[Dict[str, Any]]) -> str:
             parts.append(f"{label}: {value:.4f}")
         else:
             parts.append(f"{label}: {value}")
+
     return " | ".join(parts) if parts else "Sin indicadores"
+
+
 async def fetchRankingData(executionId: str) -> Dict[str, Any]:
     """
     Obtiene todos los datos de ranking desde ms-analytics para un execution_id dado.
     Se pagina internamente para obtener TODOS los registros.
+
     Returns:
         Dict con claves 'zones' (lista), 'total' (int), 'execution_id' (str).
+
     Raises:
         httpx.HTTPStatusError: Si ms-analytics responde con error.
         Exception: Si el servicio no es alcanzable.
@@ -70,6 +82,7 @@ async def fetchRankingData(executionId: str) -> Dict[str, Any]:
     page = 1
     pageSize = 100
     totalFetched = 0
+
     async with httpx.AsyncClient(timeout=15.0) as client:
         while True:
             url = (
@@ -79,17 +92,22 @@ async def fetchRankingData(executionId: str) -> Dict[str, Any]:
             response = await client.get(url)
             response.raise_for_status()
             data = response.json()
+
             zones = data.get("data", [])
             allZones.extend(zones)
             totalFetched += len(zones)
+
             if not data.get("has_next", False) or len(zones) == 0:
                 break
             page += 1
+
     return {
         "zones": allZones,
         "total": data.get("total", totalFetched),
         "execution_id": executionId,
     }
+
+
 async def fetchZoneIndicators(zoneCode: str) -> Optional[Dict[str, Any]]:
     """
     Obtiene los indicadores calculados para una zona específica desde ms-analytics.
@@ -104,10 +122,13 @@ async def fetchZoneIndicators(zoneCode: str) -> Optional[Dict[str, Any]]:
     except Exception as exc:
         logger.warning(f"Error fetching indicators for zone {zoneCode}: {exc}")
         return None
+
+
 async def validateExecutionStatus(executionId: str) -> Dict[str, Any]:
     """
     Valida que el execution_id exista y tenga estado COMPLETED en ms-analytics.
     Consulta el endpoint de resultados de scoring.
+
     Returns:
         Dict con 'valid' (bool), 'status' (str), 'message' (str).
     """
@@ -119,6 +140,7 @@ async def validateExecutionStatus(executionId: str) -> Dict[str, Any]:
                 f"?execution_id={executionId}&page=1&page_size=1"
             )
             response = await client.get(url)
+
             if response.status_code != 200:
                 return {
                     "valid": False,
@@ -128,7 +150,9 @@ async def validateExecutionStatus(executionId: str) -> Dict[str, Any]:
                         "Verifique que el ID sea correcto."
                     ),
                 }
+
             data = response.json()
+
             # Si el ranking retorna success=true y hay datos, consideramos COMPLETED
             if data.get("success") and data.get("total", 0) > 0:
                 return {
@@ -136,11 +160,13 @@ async def validateExecutionStatus(executionId: str) -> Dict[str, Any]:
                     "status": "COMPLETED",
                     "message": "Ejecución completada y lista para exportación.",
                 }
+
             # También verificamos el endpoint de scoring results
             scoringUrl = (
                 f"{settings.MS_ANALYTICS_URL}/api/v1/scoring/results/{executionId}"
             )
             scoringResponse = await client.get(scoringUrl)
+
             if scoringResponse.status_code == 200:
                 scoringData = scoringResponse.json()
                 status = scoringData.get("status", "UNKNOWN")
@@ -158,6 +184,7 @@ async def validateExecutionStatus(executionId: str) -> Dict[str, Any]:
                         "Solo se pueden exportar análisis completados (COMPLETED)."
                     ),
                 }
+
             return {
                 "valid": False,
                 "status": "IN_PROGRESS",
@@ -166,6 +193,7 @@ async def validateExecutionStatus(executionId: str) -> Dict[str, Any]:
                     "Solo se pueden exportar análisis con estado COMPLETED."
                 ),
             }
+
     except httpx.ConnectError:
         # Si ms-analytics no está disponible, permitir el uso con mock data
         logger.warning(
@@ -183,23 +211,30 @@ async def validateExecutionStatus(executionId: str) -> Dict[str, Any]:
             "status": "ERROR",
             "message": f"Error al validar el estado de la ejecución: {str(exc)}",
         }
+
+
 def generateRankingCsv(rankingData: Dict[str, Any]) -> bytes:
     """
     Genera un archivo CSV en memoria con los datos del ranking.
     Utiliza codificación UTF-8 con BOM para compatibilidad con Excel.
+
     Encabezados: Zona, Indicadores, Score, Nivel, Recomendación
+
     Returns:
         bytes del archivo CSV listo para streaming.
     """
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_ALL)
+
     # Encabezados en español
     writer.writerow(["Zona", "Indicadores", "Score", "Nivel", "Recomendación"])
+
     zones = rankingData.get("zones", [])
     for zone in zones:
         zoneName = zone.get("zone_name", zone.get("zone_code", "N/A"))
         scoreValue = zone.get("score_value", 0.0)
         scoreLevel = zone.get("score_level", "N/A")
+
         # Construir string de indicadores desde los datos disponibles
         indicatorParts = []
         if "indicators" in zone and zone["indicators"]:
@@ -219,8 +254,10 @@ def generateRankingCsv(rankingData: Dict[str, Any]) -> bytes:
         else:
             # Fallback: usar los campos disponibles del ranking
             indicatorParts.append(f"Score: {scoreValue:.4f}")
+
         indicatorsStr = " | ".join(indicatorParts) if indicatorParts else "N/A"
         recommendation = _generateRecommendation(scoreLevel, scoreValue)
+
         writer.writerow([
             zoneName.title(),
             indicatorsStr,
@@ -228,29 +265,37 @@ def generateRankingCsv(rankingData: Dict[str, Any]) -> bytes:
             scoreLevel,
             recommendation,
         ])
+
     # UTF-8 con BOM para Excel
     csvContent = output.getvalue()
     return ("\ufeff" + csvContent).encode("utf-8")
+
+
 async def buildZoneReport(zoneCode: str) -> Dict[str, Any]:
     """
     Construye el reporte completo de una zona para exportación JSON.
     Incluye indicadores, scores, predicción y recomendación.
     """
     zoneData = await fetchZoneIndicators(zoneCode)
+
     if not zoneData:
         # Generar reporte mock si no hay datos reales
         return _buildMockZoneReport(zoneCode)
+
     # Extraer y enriquecer los datos
     score = zoneData.get("score") or {}
     indicators = zoneData.get("indicators") or {}
+
     scoreValue = 0.0
     scoreLevel = "N/A"
+
     if isinstance(score, dict):
         scoreValue = score.get("score_value", 0.0) or 0.0
         scoreLevel = score.get("score_level", "N/A") or "N/A"
     elif hasattr(score, "score_value"):
         scoreValue = score.score_value or 0.0
         scoreLevel = score.score_level or "N/A"
+
     indicatorData = {}
     if isinstance(indicators, dict):
         indicatorData = {
@@ -266,13 +311,16 @@ async def buildZoneReport(zoneCode: str) -> Dict[str, Any]:
             "education_indicator": getattr(indicators, "education_indicator", 0.0),
             "competition_indicator": getattr(indicators, "competition_indicator", 0.0),
         }
+
     # Calcular combined_score (promedio ponderado de indicadores)
     indicatorValues = [v for v in indicatorData.values() if isinstance(v, (int, float))]
     combinedScore = (
         sum(indicatorValues) / len(indicatorValues) if indicatorValues else 0.0
     )
+
     # Predicción basada en tendencia de indicadores
     prediction = _generatePrediction(scoreLevel, combinedScore)
+
     return {
         "zone_code": zoneCode,
         "zone_name": zoneData.get("zone_name", zoneCode),
@@ -289,6 +337,8 @@ async def buildZoneReport(zoneCode: str) -> Dict[str, Any]:
             "version": "1.0",
         },
     }
+
+
 def _generatePrediction(scoreLevel: str, combinedScore: float) -> Dict[str, Any]:
     """Genera una predicción de tendencia para la zona."""
     if combinedScore > 0.7:
@@ -300,6 +350,7 @@ def _generatePrediction(scoreLevel: str, combinedScore: float) -> Dict[str, Any]
     else:
         trend = "DESCENDENTE"
         confidence = 0.68
+
     return {
         "trend": trend,
         "confidence": round(confidence, 2),
@@ -310,6 +361,8 @@ def _generatePrediction(scoreLevel: str, combinedScore: float) -> Dict[str, Any]
             f"{confidence * 100:.0f}%."
         ),
     }
+
+
 def _buildMockZoneReport(zoneCode: str) -> Dict[str, Any]:
     """Genera un reporte mock cuando no hay datos reales disponibles."""
     mockIndicators = {
@@ -320,6 +373,7 @@ def _buildMockZoneReport(zoneCode: str) -> Dict[str, Any]:
     }
     mockScore = 0.62
     mockLevel = "MEDIA"
+
     return {
         "zone_code": zoneCode,
         "zone_name": zoneCode,
