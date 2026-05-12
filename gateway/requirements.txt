@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+httpx
+pydantic
+pydantic-settings
+python-jose[cryptography]==3.3.0
